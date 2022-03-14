@@ -12,8 +12,14 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
-    Extract { nds_path: PathBuf, out_path: PathBuf },
-    Build { root: PathBuf, out_path: PathBuf },
+    Extract {
+        nds_path: PathBuf,
+        out_path: PathBuf,
+    },
+    Build {
+        root: PathBuf,
+        out_path: PathBuf,
+    },
 }
 
 fn main() {
