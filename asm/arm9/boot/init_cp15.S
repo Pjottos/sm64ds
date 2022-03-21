@@ -1,3 +1,5 @@
+.global _COMPRESSED_END_
+
 .global init_cp15
 .global DAT_02004ad8
 
@@ -115,4 +117,4 @@ DAT_02004ae4:
 DAT_02004ae8:
     .word 0x020A24E0
 DAT_02004aec:
-    .word 0x0205C0AC
+    .word _COMPRESSED_END_
