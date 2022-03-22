@@ -1,3 +1,5 @@
+use util::blz;
+
 use clap::{Parser, Subcommand};
 
 use std::{
@@ -5,8 +7,6 @@ use std::{
     io::{self, prelude::*},
     path::PathBuf,
 };
-
-mod extract;
 
 #[derive(Parser)]
 struct Args {
@@ -40,7 +40,7 @@ fn main() {
     };
 
     let output = match args.command {
-        Command::Extract { offset } => extract::extract(input, offset),
+        Command::Extract { offset } => blz::extract(input, offset),
     };
 
     if let Some(out_path) = args.out_path {
