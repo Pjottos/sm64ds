@@ -26,7 +26,7 @@ enum Command {
 fn main() {
     let args = Args::parse();
 
-    let input = if let Some(in_path) = args.in_path {
+    let mut input = if let Some(in_path) = args.in_path {
         fs::read(in_path).expect("failed to read input file")
     } else {
         let stdin = io::stdin();
@@ -40,7 +40,10 @@ fn main() {
     };
 
     let output = match args.command {
-        Command::Extract { offset } => blz::extract(input, offset),
+        Command::Extract { offset } => {
+            let range = blz::extract(&mut input, offset);
+            &input[range]
+        }
     };
 
     if let Some(out_path) = args.out_path {

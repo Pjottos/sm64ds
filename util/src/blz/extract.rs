@@ -1,4 +1,8 @@
-pub fn extract(mut buf: Vec<u8>, offset: usize) -> Vec<u8> {
+use std::ops::Range;
+
+/// Extract BLZ region with the end of the footer at the specified offset, in place.
+/// Returns range of decompressed data.
+pub fn extract(buf: &mut [u8], offset: usize) -> Range<usize> {
     assert!(offset < buf.len(), "invalid compressed data offset");
     assert!(
         buf.len() - offset >= 8,
@@ -70,8 +74,5 @@ pub fn extract(mut buf: Vec<u8>, offset: usize) -> Vec<u8> {
         }
     }
 
-    buf.truncate(offset + dest_offset);
-    buf.drain(..dest);
-
-    buf
+    dest..offset + dest_offset
 }
