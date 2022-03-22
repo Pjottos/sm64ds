@@ -50,7 +50,7 @@ fn main() {
             );
 
             out_path.push("bin");
-            fs::create_dir_all(&out_path);
+            fs::create_dir_all(&out_path).expect("failed to create output path");
             write_output(&mut out_path, "arm9.bin", arm9);
             write_output(&mut out_path, "arm7.bin", arm7);
             write_output(&mut out_path, "arm9_overlay.bin", arm9_overlay);
