@@ -54,14 +54,17 @@ define print_single
 endef
 
 # Targets
-all: $(BUILD_DIR)/arm9.elf
+all: $(BUILD_DIR)/arm9.elf utils
 
 clean:
-	-rm -r $(BUILD_DIR_BASE)
+	$(V)-rm -r $(BUILD_DIR_BASE)
 	
 distclean: clean
-	cd util
-	cargo clean
+	$(V)cd util && cargo clean
+
+utils:
+	@$(PRINT) "$(GREEN)Building utils$(NO_COL)\n"
+	$(V)cd util && cargo build --release
 
 $(BUILD_DIR)/asm/arm9/%.o: asm/arm9/%.S
 	$(call print,Assembling:,$<,$@)
