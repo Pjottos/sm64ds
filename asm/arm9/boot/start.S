@@ -1,5 +1,5 @@
 .global init_cp15
-.global decompress_code
+.global blz_extract
 .global init_data_sections
 .global DAT_02004ad8
 
@@ -37,7 +37,7 @@ _start:
     // Decompress the main code
     ldr        r1, PTR_DAT_020048c0
     ldr        r0, [r1, #0x14]
-    bl         decompress_code
+    bl         blz_extract
 
     // Initialize .data and .bss
     bl         init_data_sections

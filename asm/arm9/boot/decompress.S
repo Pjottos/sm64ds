@@ -1,8 +1,8 @@
-.global decompress_code
+.global blz_extract
 
 // Params:
 //     r0 - End of compressed region
-decompress_code:
+blz_extract:
     cmp        r0, #0
     beq        _02004978
     stmdb      sp!, { r4, r5, r6, r7 }

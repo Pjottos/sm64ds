@@ -26,15 +26,28 @@ fn main() {
     let args = Args::parse();
 
     match args.command {
-        Command::Extract { nds_path, mut out_path } => {
+        Command::Extract {
+            nds_path,
+            mut out_path,
+        } => {
             let rom = fs::read(nds_path).expect("failed to read nds file");
             let header = header::NdsHeader::load(&rom).expect("failed to parse header");
             println!("{:x?}", header);
 
             let arm9 = checked_rom_range(&rom, header.arm9_rom_offset, header.arm9_size, "arm9");
             let arm7 = checked_rom_range(&rom, header.arm7_rom_offset, header.arm7_size, "arm7");
-            let arm9_overlay = checked_rom_range(&rom, header.arm9_overlay_offset, header.arm9_overlay_size, "arm9 overlay");
-            let arm7_overlay = checked_rom_range(&rom, header.arm7_overlay_offset, header.arm7_overlay_size, "arm7 overlay");
+            let arm9_overlay = checked_rom_range(
+                &rom,
+                header.arm9_overlay_offset,
+                header.arm9_overlay_size,
+                "arm9 overlay",
+            );
+            let arm7_overlay = checked_rom_range(
+                &rom,
+                header.arm7_overlay_offset,
+                header.arm7_overlay_size,
+                "arm7 overlay",
+            );
 
             out_path.push("bin");
             fs::create_dir_all(&out_path);
