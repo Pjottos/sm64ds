@@ -2,6 +2,7 @@
 .global blz_extract
 .global init_data_sections
 .global DAT_02004ad8
+.global os_main
 
 .global _start
 
@@ -98,8 +99,6 @@ DAT_020048c8:
 DAT_020048cc:
     .word 0x01ffd8e0
 PTR_FUN_020048d0:
-    // TODO: this function pointer is hardcoded because it is a function inside the
-    // decompressed code. Should be possible to determine the offset at compile time.
-    .word 0x02007000
+    .word os_main
 PTR_H_Reset_020048d4:
     .word 0xffff0000

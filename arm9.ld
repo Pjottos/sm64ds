@@ -6,6 +6,8 @@ INPUT
     decompress.o
     init_data_sections.o
     init_cp15.o
+
+    main.o
 )
 
 SECTIONS
@@ -15,6 +17,8 @@ SECTIONS
         decompress.o (.text)
         init_data_sections.o (.text)
         init_cp15.o (.text)
+
+        main.o (.text)
     }
 
     .compressed ALIGN(0x1000) : {

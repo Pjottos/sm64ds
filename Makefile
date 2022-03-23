@@ -17,24 +17,39 @@ ifeq ($(VERBOSE), 0)
     V := @
 endif
 
-CC := clang
+# Include dirs
+INCLUDE_DIRS := include src
+INC_CFLAGS := $(foreach inc,$(INCLUDE_DIRS),-I$(inc))
+
+MATCHING ?= 1
+ifeq ($(MATCHING), 1)
+    CC := wine toolchain/mwccarm.exe
+    CFLAGS_ARM9 := -proc v5te -opt full $(INC_CFLAGS)
+else
+    CC := clang
+    CFLAGS_ARM9 := -target armv5te-none-eabi -O3 $(INC_CFLAGS)
+endif
+    
+AS := clang
+ASFLAGS_ARM9 := -target armv5te-none-eabi
 LD := ld.lld
 OBJCOPY := llvm-objcopy
 
-CFLAGS_ARM9 := -target armv5te-none-eabi
-
+# Source and object files
 BUILD_DIR_BASE := build
 BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)
 
-ARM9_SRC_DIRS := asm/arm9
-ARM9_BOOT_SRC_DIR := asm/arm9/boot
+ARM9_ASM_DIRS := asm/arm9 asm/arm9/boot
+ARM9_SRC_DIRS := src/arm9
 
-ALL_DIRS := $(ARM9_SRC_DIRS) $(ARM9_BOOT_SRC_DIR)
+ALL_DIRS := $(ARM9_ASM_DIRS) $(ARM9_SRC_DIRS)
 DUMMY != mkdir -p $(addprefix $(BUILD_DIR)/, $(ALL_DIRS))
 
-ARM9_BOOT_S_FILES := $(wildcard $(ARM9_BOOT_SRC_DIR)/*.S)
+ARM9_S_FILES := $(foreach dir,$(ARM9_ASM_DIRS),$(wildcard $(dir)/*.S))
+ARM9_CPP_FILES := $(foreach dir,$(ARM9_SRC_DIRS),$(wildcard $(dir)/*.cpp))
 
-ARM9_BOOT_O_FILES := $(foreach file,$(ARM9_BOOT_S_FILES),$(BUILD_DIR)/$(file:.S=.o))
+ARM9_O_FILES := $(foreach file,$(ARM9_CPP_FILES),$(BUILD_DIR)/$(file:.cpp=.o)) \
+                $(foreach file,$(ARM9_S_FILES),$(BUILD_DIR)/$(file:.S=.o))
 
 # Pretty print helper
 PRINT := printf
@@ -55,7 +70,7 @@ endef
 
 # Targets
 all: $(BUILD_DIR)/arm9.elf utils
-
+	 
 clean:
 	$(V)-rm -r $(BUILD_DIR_BASE)
 	
@@ -68,8 +83,12 @@ utils:
 
 $(BUILD_DIR)/asm/arm9/%.o: asm/arm9/%.S
 	$(call print,Assembling:,$<,$@)
+	$(V)$(AS) $(ASFLAGS_ARM9) -c $< -o $@
+	
+$(BUILD_DIR)/src/arm9/%.o: src/arm9/%.cpp
+	$(call print,Compiling:,$<,$@)
 	$(V)$(CC) $(CFLAGS_ARM9) -c $< -o $@
 
-$(BUILD_DIR)/arm9.elf: $(ARM9_BOOT_O_FILES) arm9.ld
+$(BUILD_DIR)/arm9.elf: $(ARM9_O_FILES) arm9.ld
 	$(call print_single,Linking:,$@)
-	$(V)$(LD) -T arm9.ld -L $(BUILD_DIR)/$(ARM9_BOOT_SRC_DIR) -o $@
+	$(V)$(LD) -T arm9.ld $(foreach dir,$(ARM9_SRC_DIRS) $(ARM9_ASM_DIRS),-L $(BUILD_DIR)/$(dir)) -o $@
