@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 
 use std::{fs, path::PathBuf};
 
+mod file_table;
 mod header;
 
 #[derive(Parser)]
@@ -34,7 +35,7 @@ fn main() {
         } => {
             let rom = fs::read(nds_path).expect("failed to read nds file");
             let header = header::NdsHeader::load(&rom).expect("failed to parse header");
-            println!("{:#x?}", header);
+            println!("header dump: {:x?}", header);
 
             let arm9 = checked_rom_range(&rom, header.arm9_rom_offset, header.arm9_size, "arm9");
             let compressed_end = header.arm9_rom_offset + header.arm9_size;
@@ -63,6 +64,11 @@ fn main() {
                 header.arm7_overlay_size,
                 "arm7 overlay",
             );
+
+            let files =
+                file_table::FileTable::load(&rom, &header).expect("failed to load file table");
+            out_path.push("fs");
+            out_path.pop();
 
             out_path.push("bin");
             fs::create_dir_all(&out_path).expect("failed to create output path");
