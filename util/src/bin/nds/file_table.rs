@@ -116,6 +116,13 @@ impl FileTable {
                     )
                 })?;
 
+                if name == "." || name == ".." {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "file table entry name is \".\" or \"..\"",
+                    ));
+                }
+
                 if flags & 0x80 != 0 {
                     let offset = meta_entries.read_u32::<LittleEndian>()?;
                     let first_file_idx = meta_entries.read_u16::<LittleEndian>()?;
