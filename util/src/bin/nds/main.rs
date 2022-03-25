@@ -145,7 +145,7 @@ fn write_overlays(
     for overlay in overlays {
         let file = file_table.file(overlay.file_id());
         let name = match file.name() {
-            FileName::Overlay(num) => format!("overlay{}", num),
+            FileName::Overlay(num) => format!("overlay{}.bin", num),
             FileName::Name(_) => unreachable!(),
         };
         write_output(path, &name, file.data());
