@@ -34,13 +34,6 @@ pub struct Directory {
 }
 
 impl Directory {
-    fn count_files(&self) -> usize {
-        self.entries
-            .iter()
-            .filter(|e| matches!(e, Entry::File(_)))
-            .count()
-    }
-
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
