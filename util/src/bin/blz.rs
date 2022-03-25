@@ -52,7 +52,7 @@ fn main() {
         let stdout = io::stdout();
         stdout
             .lock()
-            .write_all(&output)
+            .write_all(output)
             .expect("failed to write output to stdout");
     }
 }

@@ -65,19 +65,40 @@ fn main() {
                 "arm7 overlay",
             );
 
-            let files =
-                file_table::FileTable::load(&rom, &header).expect("failed to load file table");
-            out_path.push("fs");
-            out_path.pop();
-
             out_path.push("bin");
-            fs::create_dir_all(&out_path).expect("failed to create output path");
+            fs::create_dir_all(&out_path).expect("failed to create bin dir");
             write_output(&mut out_path, "arm9.bin", arm9);
             write_output(&mut out_path, "arm9_extracted.bin", &arm9_extracted);
             write_output(&mut out_path, "arm7.bin", arm7);
             write_output(&mut out_path, "arm9_overlay.bin", arm9_overlay);
             write_output(&mut out_path, "arm7_overlay.bin", arm7_overlay);
             out_path.pop();
+
+            let files =
+                file_table::FileTable::load(&rom, &header).expect("failed to load file table");
+            let mut dir_stack = vec![files.root().iter()];
+            out_path.push("fs");
+            fs::create_dir_all(&out_path).expect("failed to create fs dir");
+            'dirs: while let Some(mut entries) = dir_stack.pop() {
+                for entry in &mut entries {
+                    match entry {
+                        file_table::Entry::Directory(id) => {
+                            let dir = files.dir(*id);
+                            dir_stack.push(entries);
+                            dir_stack.push(dir.iter());
+                            out_path.push(dir.name());
+                            fs::create_dir_all(&out_path).expect("failed to create fs subdir");
+
+                            continue 'dirs;
+                        }
+                        file_table::Entry::File(file) => {
+                            write_output(&mut out_path, file.name(), file.data())
+                        }
+                    }
+                }
+
+                out_path.pop();
+            }
         }
         _ => todo!(),
     }
@@ -94,6 +115,7 @@ fn checked_rom_range<'a>(rom: &'a [u8], offset: u32, size: u32, range_name: &str
 
 fn write_output(path: &mut PathBuf, file_name: &str, content: &[u8]) {
     path.push(file_name);
+    // println!("Writing: {}", path.as_os_str().to_string_lossy());
     fs::write(&path, content).expect("failed to write output");
     path.pop();
 }
