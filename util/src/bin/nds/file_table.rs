@@ -7,13 +7,13 @@ use std::io::{self, prelude::*};
 
 #[derive(Debug, Clone)]
 pub struct File {
-    name: AsciiString,
+    name: FileName,
     data: Vec<u8>,
 }
 
 impl File {
-    pub fn name(&self) -> &str {
-        self.name.as_str()
+    pub fn name(&self) -> &FileName {
+        &self.name
     }
 
     pub fn data(&self) -> &[u8] {
@@ -22,9 +22,14 @@ impl File {
 }
 
 #[derive(Debug, Clone)]
+pub enum FileName {
+    Overlay(usize),
+    Name(AsciiString),
+}
+
+#[derive(Debug, Clone)]
 pub struct Directory {
     name: AsciiString,
-    first_file_idx: u16,
     entries: Vec<Entry>,
 }
 
@@ -40,8 +45,17 @@ impl Directory {
         self.name.as_str()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Entry> {
-        self.entries.iter()
+    pub fn iter(&self) -> impl Iterator<Item = Entry> + '_ {
+        self.entries.iter().copied()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct FileId(u16);
+
+impl FileId {
+    fn as_idx(self) -> usize {
+        self.0 as usize
     }
 }
 
@@ -54,15 +68,16 @@ impl DirId {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Entry {
-    File(File),
+    File(FileId),
     Directory(DirId),
 }
 
 #[derive(Debug, Clone)]
 pub struct FileTable {
     directories: Vec<Directory>,
+    files: Vec<File>,
 }
 
 impl FileTable {
@@ -73,7 +88,7 @@ impl FileTable {
         let mut meta_entries = meta_start;
 
         let root_offset = meta_entries.read_u32::<LittleEndian>()?;
-        let root_file_idx = meta_entries.read_u16::<LittleEndian>()?;
+        let root_file_id = FileId(meta_entries.read_u16::<LittleEndian>()?);
         let total_dir_count = meta_entries.read_u16::<LittleEndian>()? as usize;
         // Directory ids are in range 0xF000..=0xFFFF
         if total_dir_count > 0x1000 {
@@ -86,9 +101,18 @@ impl FileTable {
         let mut alloc_start = rom;
         alloc_start.consume(header.file_alloc_table_offset as usize);
 
+        let mut overlay_alloc = alloc_start;
+        let mut files = (0..root_file_id.as_idx())
+            .map(|i| {
+                Self::read_file_data(rom, &mut overlay_alloc).map(|data| File {
+                    name: FileName::Overlay(i),
+                    data,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
         let root = Directory {
             name: AsciiString::from_ascii(b"root".to_vec()).unwrap(),
-            first_file_idx: root_file_idx,
             entries: vec![],
         };
 
@@ -97,7 +121,7 @@ impl FileTable {
 
         let mut root_meta = meta_start;
         root_meta.consume(root_offset as usize);
-        let mut dir_stack = vec![(0, root_meta, root_file_idx as usize)];
+        let mut dir_stack = vec![(0, root_meta, root_file_id.as_idx())];
 
         'dirs: while let Some((i, mut meta, mut file_idx)) = dir_stack.pop() {
             loop {
@@ -125,7 +149,7 @@ impl FileTable {
 
                 if flags & 0x80 != 0 {
                     let offset = meta_entries.read_u32::<LittleEndian>()?;
-                    let first_file_idx = meta_entries.read_u16::<LittleEndian>()?;
+                    let first_file_id = FileId(meta_entries.read_u16::<LittleEndian>()?);
 
                     let parent_id = DirId(meta_entries.read_u16::<LittleEndian>()?);
                     if parent_id.as_idx() >= directories.len() {
@@ -145,7 +169,6 @@ impl FileTable {
 
                     let next_dir = Directory {
                         name,
-                        first_file_idx,
                         entries: vec![],
                     };
                     directories.push(next_dir);
@@ -156,32 +179,25 @@ impl FileTable {
 
                     directories[i].entries.push(Entry::Directory(dir_id));
                     dir_stack.push((i, meta, file_idx));
-                    dir_stack.push((next_i, next_meta, first_file_idx as usize));
+                    dir_stack.push((next_i, next_meta, first_file_id.as_idx()));
                     continue 'dirs;
                 } else {
                     let mut alloc = alloc_start;
                     alloc.consume(file_idx * 8);
-                    let data_start = alloc.read_u32::<LittleEndian>()? as usize;
-                    let data_end = alloc.read_u32::<LittleEndian>()? as usize;
+                    let data = Self::read_file_data(rom, &mut alloc)?;
+
+                    let name = FileName::Name(name);
+                    let file = File { name, data };
+                    let id = FileId(file_idx.try_into().unwrap());
                     file_idx += 1;
 
-                    // Files must not be in the secure area, and of course inside the rom.
-                    if data_start < 0x8000 || data_start > data_end || data_end > rom.len() {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "invalid file data address",
-                        ));
-                    }
-                    let data = rom[data_start..data_end].to_vec();
-
-                    directories[i]
-                        .entries
-                        .push(Entry::File(File { name, data }));
+                    files.push(file);
+                    directories[i].entries.push(Entry::File(id));
                 };
             }
         }
 
-        Ok(Self { directories })
+        Ok(Self { directories, files })
     }
 
     pub fn root(&self) -> &Directory {
@@ -190,5 +206,30 @@ impl FileTable {
 
     pub fn dir(&self, id: DirId) -> &Directory {
         self.directories.get(id.as_idx()).expect("invalid DirId")
+    }
+
+    pub fn file(&self, id: FileId) -> &File {
+        self.files.get(id.as_idx()).expect("invalid FileId")
+    }
+
+    pub fn checked_file_id(&self, raw: u16) -> Option<FileId> {
+        let res = FileId(raw);
+
+        (res.as_idx() < self.files.len()).then(|| res)
+    }
+
+    fn read_file_data(rom: &[u8], alloc: &mut &[u8]) -> Result<Vec<u8>, io::Error> {
+        let data_start = alloc.read_u32::<LittleEndian>()? as usize;
+        let data_end = alloc.read_u32::<LittleEndian>()? as usize;
+
+        // Files must not be in the secure area, and of course inside the rom.
+        if data_start < 0x8000 || data_start > data_end || data_end > rom.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "invalid file data address",
+            ));
+        }
+
+        Ok(rom[data_start..data_end].to_vec())
     }
 }

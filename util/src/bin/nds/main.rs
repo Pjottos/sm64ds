@@ -1,3 +1,7 @@
+use crate::{
+    file_table::{FileName, FileTable},
+    overlay::OverlayTable,
+};
 use util::blz;
 
 use clap::{Parser, Subcommand};
@@ -6,6 +10,7 @@ use std::{fs, path::PathBuf};
 
 mod file_table;
 mod header;
+mod overlay;
 
 #[derive(Parser)]
 struct Args {
@@ -35,7 +40,7 @@ fn main() {
         } => {
             let rom = fs::read(nds_path).expect("failed to read nds file");
             let header = header::NdsHeader::load(&rom).expect("failed to parse header");
-            println!("header dump: {:x?}", header);
+            // println!("header dump: {:x?}", header);
 
             let arm9 = checked_rom_range(&rom, header.arm9_rom_offset, header.arm9_size, "arm9");
             let compressed_end = header.arm9_rom_offset + header.arm9_size;
@@ -52,38 +57,30 @@ fn main() {
 
             let arm7 = checked_rom_range(&rom, header.arm7_rom_offset, header.arm7_size, "arm7");
 
-            let arm9_overlay = checked_rom_range(
-                &rom,
-                header.arm9_overlay_offset,
-                header.arm9_overlay_size,
-                "arm9 overlay",
-            );
-            let arm7_overlay = checked_rom_range(
-                &rom,
-                header.arm7_overlay_offset,
-                header.arm7_overlay_size,
-                "arm7 overlay",
-            );
-
             out_path.push("bin");
             fs::create_dir_all(&out_path).expect("failed to create bin dir");
             write_output(&mut out_path, "arm9.bin", arm9);
             write_output(&mut out_path, "arm9_extracted.bin", &arm9_extracted);
             write_output(&mut out_path, "arm7.bin", arm7);
-            write_output(&mut out_path, "arm9_overlay.bin", arm9_overlay);
-            write_output(&mut out_path, "arm7_overlay.bin", arm7_overlay);
             out_path.pop();
 
-            let files =
-                file_table::FileTable::load(&rom, &header).expect("failed to load file table");
-            let mut dir_stack = vec![files.root().iter()];
+            let file_table = FileTable::load(&rom, &header).expect("failed to load file table");
+
+            let overlay_table = OverlayTable::load(&rom, &header, &file_table)
+                .expect("failed to load overlay table");
+            // println!("overlay dump: {:#x?}", overlay_table);
+
+            out_path.push("overlays");
+            out_path.pop();
+
+            let mut dir_stack = vec![file_table.root().iter()];
             out_path.push("fs");
             fs::create_dir_all(&out_path).expect("failed to create fs dir");
             'dirs: while let Some(mut entries) = dir_stack.pop() {
                 for entry in &mut entries {
                     match entry {
                         file_table::Entry::Directory(id) => {
-                            let dir = files.dir(*id);
+                            let dir = file_table.dir(id);
                             dir_stack.push(entries);
                             dir_stack.push(dir.iter());
                             out_path.push(dir.name());
@@ -91,8 +88,15 @@ fn main() {
 
                             continue 'dirs;
                         }
-                        file_table::Entry::File(file) => {
-                            write_output(&mut out_path, file.name(), file.data())
+                        file_table::Entry::File(id) => {
+                            let file = file_table.file(id);
+                            let name = match file.name() {
+                                FileName::Name(name) => name.as_str(),
+                                FileName::Overlay(_) => {
+                                    panic!("directory references overlay file")
+                                }
+                            };
+                            write_output(&mut out_path, name, file.data())
                         }
                     }
                 }
