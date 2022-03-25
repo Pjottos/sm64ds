@@ -20,9 +20,9 @@ pub fn extract(buf: &mut [u8], offset: usize) -> Range<usize> {
     let dest_offset =
         u32::from_le_bytes(buf[compressed_end - 4..compressed_end].try_into().unwrap()) as usize;
 
-    eprintln!("Footer length:           {:#010x}", footer_len);
-    eprintln!("Total compressed length: {:#010x}", compressed_len);
-    eprintln!("Destination offset:      {:#010x}", dest_offset);
+    // eprintln!("Footer length:           {:#010x}", footer_len);
+    // eprintln!("Total compressed length: {:#010x}", compressed_len);
+    // eprintln!("Destination offset:      {:#010x}", dest_offset);
 
     assert!(
         footer_len <= buf.len(),
@@ -39,9 +39,9 @@ pub fn extract(buf: &mut [u8], offset: usize) -> Range<usize> {
     let mut dest = offset + dest_offset;
     assert!(dest < buf.len(), "invalid destination offset");
 
-    eprintln!("Compressed data start:   {:#010x}", compressed_start);
-    eprintln!("Compressed data end:     {:#010x}", compressed_end);
-    eprintln!("Decompressed end:        {:#010x}", dest);
+    // eprintln!("Compressed data start:   {:#010x}", compressed_start);
+    // eprintln!("Compressed data end:     {:#010x}", compressed_end);
+    // eprintln!("Decompressed end:        {:#010x}", dest);
 
     while compressed_end > compressed_start {
         compressed_end -= 1;
