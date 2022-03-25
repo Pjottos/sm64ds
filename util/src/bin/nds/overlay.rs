@@ -5,7 +5,7 @@ use crate::{
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-use std::io;
+use std::{io, ops::Range};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Overlay {
@@ -15,6 +15,28 @@ pub struct Overlay {
     file_id: FileId,
     static_initializer_start: u32,
     static_initializer_end: u32,
+}
+
+impl Overlay {
+    pub fn address(&self) -> u32 {
+        self.address
+    }
+
+    pub fn size(&self) -> u32 {
+        self.size
+    }
+
+    pub fn pad_size(&self) -> u32 {
+        self.pad_size
+    }
+
+    pub fn file_id(&self) -> FileId {
+        self.file_id
+    }
+
+    pub fn static_initializer(&self) -> Range<u32> {
+        self.static_initializer_start..self.static_initializer_end
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +64,14 @@ impl OverlayTable {
             arm9_overlays,
             arm7_overlays,
         })
+    }
+
+    pub fn arm9_overlays(&self) -> &[Overlay] {
+        &self.arm9_overlays
+    }
+
+    pub fn arm7_overlays(&self) -> &[Overlay] {
+        &self.arm7_overlays
     }
 
     fn load_single(

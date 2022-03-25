@@ -2,6 +2,7 @@ use crate::{
     file_table::{FileName, FileTable},
     overlay::OverlayTable,
 };
+use overlay::Overlay;
 use util::blz;
 
 use clap::{Parser, Subcommand};
@@ -70,8 +71,18 @@ fn main() {
                 .expect("failed to load overlay table");
             // println!("overlay dump: {:#x?}", overlay_table);
 
-            out_path.push("overlays");
-            out_path.pop();
+            write_overlays(
+                &mut out_path,
+                "arm9_overlays",
+                &file_table,
+                overlay_table.arm9_overlays(),
+            );
+            write_overlays(
+                &mut out_path,
+                "arm7_overlays",
+                &file_table,
+                overlay_table.arm7_overlays(),
+            );
 
             let mut dir_stack = vec![file_table.root().iter()];
             out_path.push("fs");
@@ -92,9 +103,7 @@ fn main() {
                             let file = file_table.file(id);
                             let name = match file.name() {
                                 FileName::Name(name) => name.as_str(),
-                                FileName::Overlay(_) => {
-                                    panic!("directory references overlay file")
-                                }
+                                FileName::Overlay(_) => unreachable!(),
                             };
                             write_output(&mut out_path, name, file.data())
                         }
@@ -121,5 +130,26 @@ fn write_output(path: &mut PathBuf, file_name: &str, content: &[u8]) {
     path.push(file_name);
     // println!("Writing: {}", path.as_os_str().to_string_lossy());
     fs::write(&path, content).expect("failed to write output");
+    path.pop();
+}
+
+fn write_overlays(
+    path: &mut PathBuf,
+    dir_name: &str,
+    file_table: &FileTable,
+    overlays: &[Overlay],
+) {
+    path.push(dir_name);
+    fs::create_dir_all(&path).expect("failed to create overlay dir");
+
+    for overlay in overlays {
+        let file = file_table.file(overlay.file_id());
+        let name = match file.name() {
+            FileName::Overlay(num) => format!("overlay{}", num),
+            FileName::Name(_) => unreachable!(),
+        };
+        write_output(path, &name, file.data());
+    }
+
     path.pop();
 }
